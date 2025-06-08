@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hamming Kodlayıcı</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f7f9;
+      color: #333;
+      padding: 30px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      text-align: center;
+      color: #004080;
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      margin-bottom: 20px;
+    }
+
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 30px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      background-color: #007acc;
+      color: white;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #005fa3;
+    }
+
+    .results p {
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    .bits-container {
+      padding: 12px;
+      background-color: #f0f8ff;
+      border-radius: 6px;
+      min-height: 40px;
+      margin-bottom: 20px;
+      word-wrap: break-word;
+    }
+
+    .bit {
+      font-family: monospace;
+      font-size: 18px;
+      margin: 0 2px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .bit.normal {
+      background-color: #007acc;
+      color: white;
+    }
+
+    .bit.error {
+      background-color: #e53935;
+      color: white;
+    }
+
+    .bit.corrected {
+      background-color: #43a047;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Hamming Kodlayıcı</h1>
+
+    <label for="dataInput">Veri (8, 16, 32 bit):</label>
+    <input type="text" id="dataInput" placeholder="örn: 10110011 veya 1101001010110101" maxlength="32" />
+
+    <div class="buttons">
+      <button id="encodeBtn">Kodla</button>
+      <button id="errorBtn">Hata Ekle</button>
+      <button id="decodeBtn">Düzelt</button>
+    </div>
+
+    <div class="results">
+      <p><strong>Kodlanmış veri:</strong></p>
+      <div id="encodedData" class="bits-container" aria-live="polite" aria-atomic="true">-</div>
+
+      <p><strong>Hatalı veri:</strong></p>
+      <div id="errorData" class="bits-container" aria-live="polite" aria-atomic="true">-</div>
+
+      <p><strong>Çözülen veri:</strong></p>
+      <div id="decodedData" class="bits-container" aria-live="polite" aria-atomic="true">-</div>
+
+      <p><strong>Hata pozisyonu:</strong> <span id="errorPosition">-</span></p>
+    </div>
+  </div>
+
+  <script>
+    let encodedBits = [];
+    let errorPos = -1;
+
+    function renderBits(containerId, bits, errorIndex = -1, corrected = false) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+      if (bits.length === 0) {
+        container.textContent = "-";
+        return;
+      }
+
+      bits.forEach((bit, idx) => {
+        const bitSpan = document.createElement("span");
+        bitSpan.textContent = bit;
+        bitSpan.classList.add("bit");
+
+        if (corrected && idx === errorIndex) {
+          bitSpan.classList.add("corrected");
+        } else if (idx === errorIndex) {
+          bitSpan.classList.add("error");
+        } else {
+          bitSpan.classList.add("normal");
+        }
+
+        container.appendChild(bitSpan);
+      });
+    }
+
+    function encode() {
+      const input = document.getElementById("dataInput").value.trim();
+      if (!/^[01]+$/.test(input) || ![8, 16, 32].includes(input.length)) {
+        alert("Lütfen 8, 16 veya 32 bit uzunluğunda, sadece 0 ve 1'lerden oluşan veri girin.");
+        return;
+      }
+
+      const dataBits = input.split("").map(Number);
+      encodedBits = encodeData(dataBits);
+      errorPos = -1;
+
+      renderBits("encodedData", encodedBits);
+      document.getElementById("errorData").textContent = "-";
+      document.getElementById("decodedData").textContent = "-";
+      document.getElementById("errorPosition").textContent = "-";
+    }
+
+    function addError() {
+      if (encodedBits.length === 0) {
+        alert("Önce veriyi kodlayın.");
+        return;
+      }
+
+      if (errorPos !== -1) {
+        alert("Zaten hata mevcut. Önce düzeltin veya yeniden kodlayın.");
+        return;
+      }
+
+      errorPos = Math.floor(Math.random() * encodedBits.length);
+      encodedBits[errorPos] ^= 1;
+
+      renderBits("errorData", encodedBits, errorPos);
+    }
+
+    function decode() {
+      if (encodedBits.length === 0) {
+        alert("Kodlanmış veri yok.");
+        return;
+      }
+
+      const { data, errorDetected, corrected, errorPosition } = decodeData(encodedBits);
+
+      if (!errorDetected) {
+        document.getElementById("errorPosition").textContent = "Hata yok";
+        renderBits("decodedData", data, -1, true);
+        renderBits("errorData", encodedBits);
+      } else {
+        const binaryPos = errorPosition.toString(2).padStart(Math.ceil(Math.log2(encodedBits.length + 1)), '0');
+        document.getElementById("errorPosition").textContent = binaryPos;
+        renderBits("decodedData", data, -1, true);
+        renderBits("errorData", corrected, errorPosition - 1, true);
+        encodedBits = corrected;
+        errorPos = -1;
+      }
+    }
+
+    function encodeData(data) {
+      const r = calculateRedundantBits(data.length);
+      const totalLength = data.length + r;
+      const encoded = Array(totalLength).fill(0);
+      const parityPositions = [];
+
+      for (let i = 0; i < r; i++) {
+        parityPositions.push(Math.pow(2, i) - 1);
+      }
+
+      let j = 0;
+      for (let i = 0; i < totalLength; i++) {
+        if (!parityPositions.includes(i)) {
+          encoded[i] = data[j];
+          j++;
+        }
+      }
+
+      for (let i = 0; i < r; i++) {
+        const parityPos = Math.pow(2, i) - 1;
+        let parity = 0;
+        for (let j = 0; j < totalLength; j++) {
+          if (((j + 1) & (parityPos + 1)) !== 0 && j !== parityPos) {
+            parity ^= encoded[j];
+          }
+        }
+        encoded[parityPos] = parity;
+      }
+
+      return encoded;
+    }
+
+    function calculateRedundantBits(m) {
+      let r = 0;
+      while (Math.pow(2, r) < m + r + 1) {
+        r++;
+      }
+      return r;
+    }
+
+    function decodeData(received) {
+      const n = received.length;
+      const r = calculateRedundantBits(n);
+      const errorSyndrome = [];
+
+      for (let i = 0; i < r; i++) {
+        const parityPos = Math.pow(2, i) - 1;
+        let parity = 0;
+        for (let j = 0; j < n; j++) {
+          if (((j + 1) & (parityPos + 1)) !== 0) {
+            parity ^= received[j];
+          }
+        }
+        errorSyndrome.push(parity);
+      }
+
+      const errorPosition = parseInt(errorSyndrome.reverse().join(""), 2);
+
+      const corrected = received.slice();
+      if (errorPosition !== 0) {
+        corrected[errorPosition - 1] ^= 1;
+      }
+
+      const data = [];
+      for (let i = 0; i < n; i++) {
+        if (!isPowerOfTwo(i + 1)) {
+          data.push(corrected[i]);
+        }
+      }
+
+      return { data, errorDetected: errorPosition !== 0, corrected, errorPosition };
+    }
+
+    function isPowerOfTwo(x) {
+      return (x & (x - 1)) === 0;
+    }
+
+    document.getElementById("encodeBtn").addEventListener("click", encode);
+    document.getElementById("errorBtn").addEventListener("click", addError);
+    document.getElementById("decodeBtn").addEventListener("click", decode);
+  </script>
+</body>
+</html>
